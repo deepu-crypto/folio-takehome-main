@@ -44,5 +44,23 @@ test('seeded share link resolves to the seeded document', function () {
     assert_true($row['title'] === 'Welcome Packet', 'unexpected title: ' . var_export($row['title'], true));
 });
 
+test('scheduled publishing controls document availability', function () {
+    $nowUtc = '2026-05-25 12:00:00';
+
+    assert_true(
+        !document_is_available('2026-05-25 13:00:00', $nowUtc),
+        'expected a future scheduled document to be unavailable'
+    );
+
+    assert_true(
+        document_is_available('2026-05-25 11:00:00', $nowUtc),
+        'expected a published document to be available'
+    );
+
+    assert_true(
+        document_is_available(null, $nowUtc),
+        'expected an unscheduled document to be available immediately'
+    );
+});
 echo "\n{$pass} passed, {$fail} failed.\n";
 exit($fail > 0 ? 1 : 0);

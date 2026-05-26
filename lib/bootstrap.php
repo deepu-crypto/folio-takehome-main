@@ -46,3 +46,12 @@ function random_token(int $bytes = 16): string {
 function h(string $s): string {
     return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 }
+function document_is_available(?string $publishAt, ?string $nowUtc = null): bool {
+    if ($publishAt === null || $publishAt === '') {
+        return true;
+    }
+
+    $nowUtc = $nowUtc ?? gmdate('Y-m-d H:i:s');
+
+    return $publishAt <= $nowUtc;
+}

@@ -9,18 +9,51 @@ $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
     $body = trim($_POST['body'] ?? '');
+    $publishAtInput = trim($_POST['publish_at'] ?? '');
+    $publishAt = null;
 
     if ($title === '' || $body === '') {
         $error = 'Title and body are required.';
-    } else {
+    } elseif ($publishAtInput !== '') {
+        $scheduledAt = DateTimeImmutable::createFromFormat(
+            '!Y-m-d\TH:i',
+            $publishAtInput,
+            new DateTimeZone('America/Chicago')
+        );
+
+        $dateErrors = DateTimeImmutable::getLastErrors();
+
+        if (
+            $scheduledAt === false ||
+            ($dateErrors !== false &&
+                ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0))
+        ) {
+            $error = 'Please enter a valid publish date and time.';
+        } else {
+            $publishAt = $scheduledAt
+                ->setTimezone(new DateTimeZone('UTC'))
+                ->format('Y-m-d H:i:s');
+        }
+    }
+
+    if ($error === null) {
         $stmt = db()->prepare('
-            INSERT INTO documents (title, body, created_by)
-            VALUES (?, ?, ?)
+            INSERT INTO documents (title, body, created_by, publish_at)
+            VALUES (?, ?, ?, ?)
         ');
-        $stmt->execute([$title, $body, $staff['id']]);
+        $stmt->execute([$title, $body, $staff['id'], $publishAt]);
         $docId = (int) db()->lastInsertId();
 
-        audit_log('create', 'document', $docId, ['title' => $title]);
+        audit_log('create', 'document', $docId, [
+            'title' => $title,
+            'publish_at' => $publishAt,
+        ]);
+
+        if ($publishAt !== null) {
+            audit_log('schedule', 'document', $docId, [
+                'publish_at' => $publishAt,
+            ]);
+        }
 
         header('Location: /admin.php?created=' . $docId);
         exit;
@@ -56,10 +89,17 @@ render_header('Admin', $staff);
             <input type="text" id="title" name="title" required>
         </div>
         <div class="form-field">
-            <label for="body">Body</label>
-            <textarea id="body" name="body" required></textarea>
-        </div>
-        <button type="submit" class="btn">Create document</button>
+    <label for="body">Body</label>
+    <textarea id="body" name="body" required></textarea>
+</div>
+
+<div class="form-field">
+    <label for="publish_at">Publish at (Central Time, optional)</label>
+    <input type="datetime-local" id="publish_at" name="publish_at">
+    <p class="meta">Leave blank to make this document available immediately.</p>
+</div>
+
+<button type="submit" class="btn">Create document</button>
     </form>
 </section>
 
