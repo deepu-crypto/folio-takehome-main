@@ -63,7 +63,7 @@ test('scheduled publishing controls document availability', function () {
     );
 });
 test('documents can be found by partial case-insensitive title search', function () {
-    $lowercaseResults = find_documents_by_title('welcome');
+    $lowercaseResults = find_documents('welcome');
 
     assert_true(
         count($lowercaseResults) === 1,
@@ -75,14 +75,14 @@ test('documents can be found by partial case-insensitive title search', function
         'expected Welcome Packet to match lowercase search'
     );
 
-    $uppercaseResults = find_documents_by_title('WELCOME');
+    $uppercaseResults = find_documents('WELCOME');
 
     assert_true(
         count($uppercaseResults) === 1,
         'expected uppercase search to match'
     );
 
-    $mixedCaseResults = find_documents_by_title('wElcome');
+    $mixedCaseResults = find_documents('wElcome');
 
     assert_true(
         count($mixedCaseResults) === 1,
@@ -94,18 +94,91 @@ test('documents can be found by partial case-insensitive title search', function
         'expected Welcome Packet to match mixed-case search'
     );
 
-    $partialResults = find_documents_by_title('packet');
+    $partialResults = find_documents('packet');
 
     assert_true(
         count($partialResults) === 1,
         'expected partial title search to match'
     );
 
-    $missingResults = find_documents_by_title('does-not-exist');
+    $missingResults = find_documents('does-not-exist');
 
     assert_true(
         count($missingResults) === 0,
         'expected no results for an unknown title'
+    );
+});
+test('documents receive searchable unique readable IDs', function () {
+    $stmt = db()->prepare('SELECT public_id FROM documents WHERE title = ?');
+    $stmt->execute(['Welcome Packet']);
+    $seededDocument = $stmt->fetch();
+
+    assert_true(
+        $seededDocument !== false &&
+        $seededDocument['public_id'] === 'welcome-packet-demo',
+        'expected seeded document to have readable ID welcome-packet-demo'
+    );
+
+    $idSearchResults = find_documents('welcome-packet-demo');
+
+    assert_true(
+        count($idSearchResults) === 1,
+        'expected readable ID search to find one document'
+    );
+
+    assert_true(
+        $idSearchResults[0]['title'] === 'Welcome Packet',
+        'expected readable ID search to find Welcome Packet'
+    );
+
+    $publicId = generate_document_public_id('Employee Onboarding Packet');
+
+    assert_true(
+        preg_match('/^employee-onboarding-packet-[a-f0-9]{6}$/', $publicId) === 1,
+        'expected readable public ID format, got: ' . $publicId
+    );
+
+    $stmt = db()->prepare('
+        INSERT INTO documents (title, body, created_by, public_id)
+        VALUES (?, ?, ?, ?)
+    ');
+    $stmt->execute([
+        'Employee Onboarding Packet',
+        'Welcome aboard.',
+        1,
+        $publicId,
+    ]);
+
+    $stmt = db()->prepare('SELECT title FROM documents WHERE public_id = ?');
+    $stmt->execute([$publicId]);
+    $storedDocument = $stmt->fetch();
+
+    assert_true(
+        $storedDocument !== false &&
+        $storedDocument['title'] === 'Employee Onboarding Packet',
+        'expected document to be stored and resolvable by readable ID'
+    );
+
+    $duplicateWasRejected = false;
+
+    try {
+        $stmt = db()->prepare('
+            INSERT INTO documents (title, body, created_by, public_id)
+            VALUES (?, ?, ?, ?)
+        ');
+        $stmt->execute([
+            'Duplicate Document',
+            'Duplicate body.',
+            1,
+            $publicId,
+        ]);
+    } catch (PDOException $e) {
+        $duplicateWasRejected = true;
+    }
+
+    assert_true(
+        $duplicateWasRejected,
+        'expected duplicate readable IDs to be rejected'
     );
 });
 echo "\n{$pass} passed, {$fail} failed.\n";

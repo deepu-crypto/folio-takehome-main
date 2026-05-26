@@ -4,11 +4,10 @@ require __DIR__ . '/../lib/bootstrap.php';
 require __DIR__ . '/../lib/layout.php';
 
 $staff = current_staff();
-$docId = (int) ($_GET['doc'] ?? 0);
-$stmt = db()->prepare('SELECT * FROM documents WHERE id = ?');
-$stmt->execute([$docId]);
+$publicId = trim($_GET['doc'] ?? '');
+$stmt = db()->prepare('SELECT * FROM documents WHERE public_id = ?');
+$stmt->execute([$publicId]);
 $doc = $stmt->fetch();
-
 if (!$doc) {
     http_response_code(404);
     render_header('Not found', $staff);

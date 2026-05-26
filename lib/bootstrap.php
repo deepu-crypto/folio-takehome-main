@@ -55,7 +55,7 @@ function document_is_available(?string $publishAt, ?string $nowUtc = null): bool
 
     return $publishAt <= $nowUtc;
 }
-function find_documents_by_title(string $search = ''): array {
+function find_documents(string $search = ''): array {
     $sql = '
         SELECT d.*, s.name AS creator_name
         FROM documents d
@@ -65,8 +65,13 @@ function find_documents_by_title(string $search = ''): array {
     $params = [];
 
     if ($search !== '') {
-        $sql .= ' WHERE LOWER(d.title) LIKE LOWER(?)';
-        $params[] = '%' . $search . '%';
+        $sql .= '
+            WHERE LOWER(d.title) LIKE LOWER(?)
+               OR LOWER(d.public_id) LIKE LOWER(?)
+        ';
+        $pattern = '%' . $search . '%';
+        $params[] = $pattern;
+        $params[] = $pattern;
     }
 
     $sql .= ' ORDER BY d.created_at DESC, d.id DESC';
@@ -75,4 +80,26 @@ function find_documents_by_title(string $search = ''): array {
     $stmt->execute($params);
 
     return $stmt->fetchAll();
+}
+function generate_document_public_id(string $title): string {
+    $slug = strtolower(trim($title));
+    $slug = preg_replace('/[^a-z0-9]+/', '-', $slug) ?? '';
+    $slug = trim($slug, '-');
+
+    if ($slug === '') {
+        $slug = 'document';
+    }
+
+    $slug = substr($slug, 0, 28);
+
+    do {
+        $suffix = bin2hex(random_bytes(3));
+        $publicId = $slug . '-' . $suffix;
+
+        $stmt = db()->prepare('SELECT id FROM documents WHERE public_id = ? LIMIT 1');
+        $stmt->execute([$publicId]);
+        $alreadyExists = $stmt->fetch() !== false;
+    } while ($alreadyExists);
+
+    return $publicId;
 }

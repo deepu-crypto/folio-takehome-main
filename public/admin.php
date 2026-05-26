@@ -37,31 +37,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($error === null) {
-        $stmt = db()->prepare('
-            INSERT INTO documents (title, body, created_by, publish_at)
-            VALUES (?, ?, ?, ?)
-        ');
-        $stmt->execute([$title, $body, $staff['id'], $publishAt]);
-        $docId = (int) db()->lastInsertId();
+    $publicId = generate_document_public_id($title);
 
-        audit_log('create', 'document', $docId, [
-            'title' => $title,
+    $stmt = db()->prepare('
+        INSERT INTO documents (title, body, created_by, publish_at, public_id)
+        VALUES (?, ?, ?, ?, ?)
+    ');
+    $stmt->execute([$title, $body, $staff['id'], $publishAt, $publicId]);
+    $docId = (int) db()->lastInsertId();
+
+    audit_log('create', 'document', $docId, [
+        'title' => $title,
+        'publish_at' => $publishAt,
+        'public_id' => $publicId,
+    ]);
+
+    if ($publishAt !== null) {
+        audit_log('schedule', 'document', $docId, [
             'publish_at' => $publishAt,
         ]);
-
-        if ($publishAt !== null) {
-            audit_log('schedule', 'document', $docId, [
-                'publish_at' => $publishAt,
-            ]);
-        }
-
-        header('Location: /admin.php?created=' . $docId);
-        exit;
     }
+
+    header('Location: /admin.php?created=' . rawurlencode($publicId));
+    exit;
+}
 }
 
 $search = trim($_GET['q'] ?? '');
-$docs = find_documents_by_title($search);
+$docs = find_documents($search);
 
 render_header('Admin', $staff);
 ?>
@@ -70,7 +73,9 @@ render_header('Admin', $staff);
 <p class="page-subtitle">Create documents and generate share links for recipients.</p>
 
 <?php if (!empty($_GET['created'])): ?>
-    <div class="banner banner-success">Document #<?= (int) $_GET['created'] ?> created.</div>
+    <div class="banner banner-success">
+        Document <?= h($_GET['created']) ?> created.
+    </div>
 <?php endif ?>
 
 <?php if ($error): ?>
@@ -103,13 +108,13 @@ render_header('Admin', $staff);
     <h2 class="card-title">Documents</h2>
         <form method="get">
         <div class="form-field">
-            <label for="q">Search documents by title</label>
+            <label for="q">Search documents by title or ID</label>
             <input
                 type="search"
                 id="q"
                 name="q"
                 value="<?= h($search) ?>"
-                placeholder="Search title..."
+                placeholder="Search title or doc ID..."
             >
         </div>
 
@@ -139,11 +144,15 @@ render_header('Admin', $staff);
             <tbody>
                 <?php foreach ($docs as $d): ?>
                     <tr>
-                        <td class="id">#<?= (int) $d['id'] ?></td>
+                        <td class="id">#<?= h($d['public_id']) ?></td>
                         <td><?= h($d['title']) ?></td>
                         <td><?= h($d['creator_name']) ?></td>
                         <td><?= h($d['created_at']) ?></td>
-                        <td><a href="/share.php?doc=<?= (int) $d['id'] ?>" class="btn-link">Create share →</a></td>
+                        <td>
+    <a href="/share.php?doc=<?= rawurlencode($d['public_id']) ?>" class="btn-link">
+        Create share →
+    </a>
+</td>
                     </tr>
                 <?php endforeach ?>
             </tbody>
