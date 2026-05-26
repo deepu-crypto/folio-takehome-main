@@ -55,3 +55,24 @@ function document_is_available(?string $publishAt, ?string $nowUtc = null): bool
 
     return $publishAt <= $nowUtc;
 }
+function find_documents_by_title(string $search = ''): array {
+    $sql = '
+        SELECT d.*, s.name AS creator_name
+        FROM documents d
+        JOIN staff s ON s.id = d.created_by
+    ';
+
+    $params = [];
+
+    if ($search !== '') {
+        $sql .= ' WHERE LOWER(d.title) LIKE LOWER(?)';
+        $params[] = '%' . $search . '%';
+    }
+
+    $sql .= ' ORDER BY d.created_at DESC, d.id DESC';
+
+    $stmt = db()->prepare($sql);
+    $stmt->execute($params);
+
+    return $stmt->fetchAll();
+}

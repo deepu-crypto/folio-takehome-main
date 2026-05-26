@@ -62,5 +62,51 @@ test('scheduled publishing controls document availability', function () {
         'expected an unscheduled document to be available immediately'
     );
 });
+test('documents can be found by partial case-insensitive title search', function () {
+    $lowercaseResults = find_documents_by_title('welcome');
+
+    assert_true(
+        count($lowercaseResults) === 1,
+        'expected one matching document for lowercase search'
+    );
+
+    assert_true(
+        $lowercaseResults[0]['title'] === 'Welcome Packet',
+        'expected Welcome Packet to match lowercase search'
+    );
+
+    $uppercaseResults = find_documents_by_title('WELCOME');
+
+    assert_true(
+        count($uppercaseResults) === 1,
+        'expected uppercase search to match'
+    );
+
+    $mixedCaseResults = find_documents_by_title('wElcome');
+
+    assert_true(
+        count($mixedCaseResults) === 1,
+        'expected mixed-case search to match'
+    );
+
+    assert_true(
+        $mixedCaseResults[0]['title'] === 'Welcome Packet',
+        'expected Welcome Packet to match mixed-case search'
+    );
+
+    $partialResults = find_documents_by_title('packet');
+
+    assert_true(
+        count($partialResults) === 1,
+        'expected partial title search to match'
+    );
+
+    $missingResults = find_documents_by_title('does-not-exist');
+
+    assert_true(
+        count($missingResults) === 0,
+        'expected no results for an unknown title'
+    );
+});
 echo "\n{$pass} passed, {$fail} failed.\n";
 exit($fail > 0 ? 1 : 0);

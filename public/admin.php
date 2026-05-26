@@ -60,12 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$docs = db()->query('
-    SELECT d.*, s.name AS creator_name
-    FROM documents d
-    JOIN staff s ON s.id = d.created_by
-    ORDER BY d.created_at DESC
-')->fetchAll();
+$search = trim($_GET['q'] ?? '');
+$docs = find_documents_by_title($search);
 
 render_header('Admin', $staff);
 ?>
@@ -105,9 +101,31 @@ render_header('Admin', $staff);
 
 <section class="card">
     <h2 class="card-title">Documents</h2>
+        <form method="get">
+        <div class="form-field">
+            <label for="q">Search documents by title</label>
+            <input
+                type="search"
+                id="q"
+                name="q"
+                value="<?= h($search) ?>"
+                placeholder="Search title..."
+            >
+        </div>
+
+        <button type="submit" class="btn">Search</button>
+
+        <?php if ($search !== ''): ?>
+            <a href="/admin.php" class="back-link">Clear search</a>
+        <?php endif ?>
+    </form>
     <?php if (empty($docs)): ?>
-        <p class="empty">No documents yet.</p>
+    <?php if ($search !== ''): ?>
+        <p class="empty">No documents match your search.</p>
     <?php else: ?>
+        <p class="empty">No documents yet.</p>
+    <?php endif ?>
+<?php else: ?>
         <table class="data">
             <thead>
                 <tr>
