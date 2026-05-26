@@ -9,6 +9,12 @@ if (file_exists($dbPath)) {
 
 $pdo = db();
 $pdo->exec(file_get_contents(__DIR__ . '/schema.sql'));
+$migrationFiles = glob(__DIR__ . '/migrations/*.sql') ?: [];
+sort($migrationFiles);
+
+foreach ($migrationFiles as $migrationFile) {
+    $pdo->exec(file_get_contents($migrationFile));
+}
 
 $pdo->exec("
     INSERT INTO staff (email, name) VALUES
@@ -16,12 +22,13 @@ $pdo->exec("
 ");
 
 $stmt = $pdo->prepare('
-    INSERT INTO documents (title, body, created_by)
-    VALUES (?, ?, 1)
+    INSERT INTO documents (title, body, created_by, public_id)
+    VALUES (?, ?, 1, ?)
 ');
 $stmt->execute([
     'Welcome Packet',
     "Welcome to Folio!\n\nThis is the body of your welcome packet.",
+    'welcome-packet-demo',
 ]);
 $docId = (int) $pdo->lastInsertId();
 
